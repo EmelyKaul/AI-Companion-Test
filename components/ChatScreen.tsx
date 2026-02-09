@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Sender, DailySession } from '../types';
 import { getAIResponse } from '../services/gemini';
-import { Send, ListChecks, Lock } from 'lucide-react';
+import { Send, ListChecks, Lock, Clock, User, Sparkles } from 'lucide-react';
 
 interface ChatScreenProps {
   session: DailySession;
@@ -14,14 +14,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const messages = session.messages;
+  // Defensive access to messages
+  const messages = session?.messages || [];
   const userMessageCount = messages.filter(m => m.sender === Sender.USER).length;
+  const aiMessageCount = messages.filter(m => m.sender === Sender.MODEL).length;
   
   // Rules
-  const MIN_MESSAGES_FOR_SURVEY = 4;
-  const MAX_MESSAGES_ALLOWED = 10;
-  const isLocked = userMessageCount >= MAX_MESSAGES_ALLOWED;
-  const canStartSurvey = userMessageCount >= MIN_MESSAGES_FOR_SURVEY;
+  const MIN_AI_MESSAGES_FOR_SURVEY = 5;
+  const MAX_USER_MESSAGES_ALLOWED = 10;
+  
+  const isLocked = userMessageCount >= MAX_USER_MESSAGES_ALLOWED;
+  const canStartSurvey = aiMessageCount >= MIN_AI_MESSAGES_FOR_SURVEY;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,7 +32,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isTyping]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || isLocked || isTyping) return;
@@ -61,53 +64,86 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
     }
   };
 
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background max-w-md mx-auto shadow-2xl overflow-hidden relative">
       {/* Header */}
       <header className="bg-white border-b border-slate-100 p-4 flex justify-between items-center sticky top-0 z-10">
         <div>
           <h2 className="font-bold text-primary">Studien-Companion</h2>
-          <p className="text-xs text-secondary">
+          <p className="text-xs text-secondary flex items-center gap-1">
+            {isLocked ? <Lock className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
             {isLocked ? 'Maximale Nachrichten erreicht' : 'Tägliche Session'}
           </p>
         </div>
         <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
-           {userMessageCount}/{MAX_MESSAGES_ALLOWED}
+           {userMessageCount}/{MAX_USER_MESSAGES_ALLOWED}
         </div>
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
         {messages.length === 0 && (
           <div className="text-center text-slate-400 mt-10 text-sm px-8">
             <p>Willkommen zur heutigen Session. Erzähl mir, wie es dir heute geht.</p>
           </div>
         )}
         
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}
-          >
+        {messages.map((msg) => {
+          const isUser = msg.sender === Sender.USER;
+          return (
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                msg.sender === Sender.USER
-                  ? 'bg-primary text-white rounded-br-none'
-                  : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
-              }`}
+              key={msg.id}
+              className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.text}
+              <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
+                
+                {/* Avatar */}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                  isUser ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'
+                }`}>
+                  {isUser ? <User size={16} /> : <Sparkles size={16} />}
+                </div>
+
+                {/* Bubble Wrapper */}
+                <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`px-4 py-3 text-sm leading-relaxed shadow-sm rounded-2xl ${
+                      isUser
+                        ? 'bg-primary text-white rounded-br-none'
+                        : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 px-1">
+                    {formatTime(msg.timestamp)}
+                  </span>
+                </div>
+
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {isTyping && (
-           <div className="flex justify-start">
-             <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
-               <div className="flex space-x-1 h-4 items-center">
-                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+           <div className="flex w-full justify-start">
+             <div className="flex max-w-[85%] flex-row items-end gap-2">
+               <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                 <Sparkles size={16} />
+               </div>
+               <div className="flex flex-col items-start">
+                 <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
+                   <div className="flex space-x-1 h-4 items-center">
+                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                   </div>
+                 </div>
+                 <span className="text-[10px] text-slate-400 mt-1 px-1">Companion schreibt...</span>
                </div>
              </div>
            </div>
