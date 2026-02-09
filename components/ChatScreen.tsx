@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Sender, DailySession } from '../types';
 import { getAIResponse } from '../services/gemini';
-import { Send, ListChecks, Lock, Clock, User, Sparkles } from 'lucide-react';
+import { Send, ListChecks, Lock, Clock, User, Sparkles, LogOut } from 'lucide-react';
 
 interface ChatScreenProps {
   session: DailySession;
   onSendMessage: (text: string, sender: Sender) => void;
   onStartSurvey: () => void;
+  onLogout: () => void;
 }
 
-const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStartSurvey }) => {
+const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStartSurvey, onLogout }) => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -79,8 +80,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
             {isLocked ? 'Maximale Nachrichten erreicht' : 'Tägliche Session'}
           </p>
         </div>
-        <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
-           {userMessageCount}/{MAX_USER_MESSAGES_ALLOWED}
+        <div className="flex items-center gap-3">
+            <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
+            {userMessageCount}/{MAX_USER_MESSAGES_ALLOWED}
+            </div>
+            <button onClick={onLogout} className="text-slate-400 hover:text-red-500 transition-colors" title="Abmelden">
+                <LogOut size={18} />
+            </button>
         </div>
       </header>
 
