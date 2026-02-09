@@ -1,9 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Message, Sender } from "../types";
 
-// Initialize the API client
-// Note: process.env.API_KEY is injected by the environment
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Removed top-level initialization. 
+// This prevents the app from crashing immediately if process.env is undefined or the key is missing.
 
 const SYSTEM_INSTRUCTION = `Du bist ein freundlicher, empathischer Begleiter für eine Forschungsstudie. 
 Deine Aufgabe ist es, ein kurzes, unterstützendes Gespräch zu führen. 
@@ -13,8 +12,29 @@ Sprich Deutsch.`;
 
 export const getAIResponse = async (history: Message[], newMessage: string): Promise<string> => {
   try {
+    // 1. Safely retrieve API Key without crashing
+    let apiKey = "";
+    try {
+      // Check if process exists before accessing it (prevents 'process is not defined' error in browsers)
+      if (typeof process !== "undefined" && process.env) {
+        apiKey = process.env.API_KEY || "";
+      }
+    } catch (e) {
+      console.warn("Environment check failed, running in demo mode.");
+    }
+
+    // 2. Fallback if no key is found (Demo Mode)
+    if (!apiKey) {
+      console.log("No API Key found. Returning mock response.");
+      // Simulate network delay for realism
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return "Dies ist eine Demo-Antwort. Die App läuft im 'Rohmodus', da kein API-Key gefunden wurde. Bitte füge 'API_KEY' in den Vercel-Umgebungsvariablen hinzu, um die echte AI zu aktivieren.";
+    }
+
+    // 3. Initialize AI only when actually needed
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+
     // Transform internal message history to Gemini format
-    // Filter out messages that might be invalid or system notifications if we had them
     const historyForModel = history.map(msg => ({
       role: msg.sender === Sender.USER ? 'user' : 'model',
       parts: [{ text: msg.text }],
@@ -36,6 +56,6 @@ export const getAIResponse = async (history: Message[], newMessage: string): Pro
     return result.text || "Entschuldigung, ich habe das nicht verstanden.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Entschuldigung, es gab ein Verbindungsproblem. Bitte versuche es später noch einmal.";
+    return "Entschuldigung, es gab ein Verbindungsproblem (API Fehler). Bitte versuche es später noch einmal.";
   }
 };
