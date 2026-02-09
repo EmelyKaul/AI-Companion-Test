@@ -37,9 +37,19 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
     if (userError) throw userError;
 
     // B. Check for existing session today
+    // CRITICAL FIX: We alias 'messages' to ensure the property name is consistent
+    // and select specific fields to avoid ambiguity.
     let { data: sessionData, error: sessionError } = await supabase
       .from('daily_sessions')
-      .select('*, messages(*)') // Join messages
+      .select(`
+        *,
+        messages:messages (
+          id,
+          content,
+          sender,
+          created_at
+        )
+      `)
       .eq('study_id', studyId)
       .eq('date', today)
       .single();
@@ -63,13 +73,17 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
       
       if (createError) throw createError;
       sessionData = { ...newSession, messages: [] };
-    } else {
-        // Sort messages by creation time
-        if (sessionData.messages) {
-            sessionData.messages.sort((a: any, b: any) => 
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-        }
+    }
+
+    // Sort messages by creation time (Oldest top, Newest bottom)
+    let sortedMessages: Message[] = [];
+    if (sessionData.messages && Array.isArray(sessionData.messages)) {
+        sortedMessages = sessionData.messages.map((m: any) => ({
+            id: m.id,
+            text: m.content,
+            sender: m.sender as Sender,
+            timestamp: new Date(m.created_at).getTime()
+        })).sort((a: Message, b: Message) => a.timestamp - b.timestamp);
     }
 
     // D. Map DB structure to App structure
@@ -79,12 +93,7 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
       surveyCompleted: sessionData.survey_completed,
       hasChatted: sessionData.has_chatted,
       surveyData: sessionData.survey_data,
-      messages: (sessionData.messages || []).map((m: any) => ({
-        id: m.id,
-        text: m.content,
-        sender: m.sender as Sender,
-        timestamp: new Date(m.created_at).getTime()
-      }))
+      messages: sortedMessages
     };
 
     return {
@@ -96,7 +105,6 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
 
   } catch (err) {
     console.error("Database Error during Login:", err);
-    // Fallback to empty state to prevent crash
     return initialState;
   }
 };
@@ -141,16 +149,49 @@ export const saveMessageToDb = async (
   };
 
   if (isSupabaseConfigured()) {
-    // Send to DB in background
-    Promise.all([
-      supabase.from('messages').insert({
-        session_id: sessionId,
-        sender: sender,
-        content: text
-      }),
-      // Mark session as chatted if not already
-      currentSession.hasChatted ? Promise.resolve() : supabase.from('daily_sessions').update({ has_chatted: true }).eq('id', sessionId)
-    ]).catch(err => console.error("DB Save Error", err));
+    // Background DB Sync
+    (async () => {
+      try {
+        let validSessionId = sessionId;
+
+        // SELF-HEALING: If sessionId is invalid (e.g. 'temp-offline-id'), fetch or create the real one
+        if (!validSessionId || validSessionId.length < 10) {
+            console.warn("Invalid Session ID detected during save. Attempting recovery...");
+            const { data: recoveredSession } = await supabase
+                .from('daily_sessions')
+                .select('id')
+                .eq('study_id', studyId)
+                .eq('date', today)
+                .single();
+            
+            if (recoveredSession) {
+                validSessionId = recoveredSession.id;
+            } else {
+                // Create if absolutely missing
+                 const { data: newSession } = await supabase
+                .from('daily_sessions')
+                .insert({ study_id: studyId, date: today })
+                .select('id')
+                .single();
+                if (newSession) validSessionId = newSession.id;
+            }
+        }
+
+        // Now perform the insert with the guaranteed valid ID
+        await Promise.all([
+          supabase.from('messages').insert({
+            session_id: validSessionId,
+            sender: sender,
+            content: text
+          }),
+          // Mark session as chatted
+          supabase.from('daily_sessions').update({ has_chatted: true }).eq('id', validSessionId)
+        ]);
+
+      } catch (err) {
+        console.error("DB Save Error:", err);
+      }
+    })();
   } else {
     // Fallback Local Storage
     localStorage.setItem('research_app_data_v1', JSON.stringify(newState));
