@@ -1,7 +1,11 @@
 import React from 'react';
-import { CalendarCheck, ShieldCheck } from 'lucide-react';
+import { CalendarCheck, ShieldCheck, LogOut } from 'lucide-react';
 
-const CompletionScreen: React.FC = () => {
+interface CompletionScreenProps {
+    onLogout: () => void;
+}
+
+const CompletionScreen: React.FC<CompletionScreenProps> = ({ onLogout }) => {
   return (
     <div className="min-h-screen bg-accent/5 flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
@@ -21,15 +25,19 @@ const CompletionScreen: React.FC = () => {
             Wir freuen uns darauf, morgen wieder mit dir zu sprechen.
           </p>
 
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-400 bg-slate-50 p-3 rounded-lg">
+          <div className="flex items-center justify-center gap-2 text-xs text-slate-400 bg-slate-50 p-3 rounded-lg mb-6">
             <ShieldCheck className="w-4 h-4" />
             <span>Deine Daten wurden sicher gespeichert.</span>
           </div>
+
+          <button 
+            onClick={onLogout}
+            className="text-slate-400 hover:text-primary text-sm flex items-center justify-center gap-2 mx-auto transition-colors"
+          >
+            <LogOut size={16} />
+            Zur Startseite zurückkehren
+          </button>
         </div>
-        
-        <p className="mt-8 text-sm text-slate-400">
-          Du kannst die App jetzt schließen.
-        </p>
       </div>
     </div>
   );

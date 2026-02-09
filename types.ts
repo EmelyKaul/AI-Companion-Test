@@ -4,7 +4,7 @@ export enum Sender {
 }
 
 export interface Message {
-  id: string;
+  id: string; // UUID from DB
   text: string;
   sender: Sender;
   timestamp: number;
@@ -18,9 +18,11 @@ export interface SurveyResponse {
 }
 
 export interface DailySession {
+  id?: string; // UUID from DB
   date: string; // YYYY-MM-DD
   messages: Message[];
   surveyCompleted: boolean;
+  hasChatted?: boolean; // New field to track if chat interaction occurred
   surveyData?: SurveyResponse;
 }
 

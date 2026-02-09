@@ -71,8 +71,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
 
   return (
     <div className="flex flex-col h-screen bg-background max-w-md mx-auto shadow-2xl overflow-hidden relative">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-100 p-4 flex justify-between items-center sticky top-0 z-10">
+      {/* Header - Increased z-index and ensured layout */}
+      <header className="bg-white border-b border-slate-100 p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div>
           <h2 className="font-bold text-primary">Studien-Companion</h2>
           <p className="text-xs text-secondary flex items-center gap-1">
@@ -84,14 +84,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
             <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
             {userMessageCount}/{MAX_USER_MESSAGES_ALLOWED}
             </div>
-            <button onClick={onLogout} className="text-slate-400 hover:text-red-500 transition-colors" title="Abmelden">
+            
+            <button 
+                type="button"
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("Logout clicked"); // Debug log
+                    onLogout();
+                }} 
+                className="flex items-center gap-1 text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-md transition-all cursor-pointer" 
+                title="Abmelden"
+            >
                 <LogOut size={18} />
+                <span className="text-xs font-medium">Exit</span>
             </button>
         </div>
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24 z-0">
         {messages.length === 0 && (
           <div className="text-center text-slate-400 mt-10 text-sm px-8">
             <p>Willkommen zur heutigen Session. Erzähl mir, wie es dir heute geht.</p>
@@ -176,7 +188,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
       )}
 
       {/* Input Area */}
-      <div className="bg-white p-4 border-t border-slate-100 absolute bottom-0 w-full">
+      <div className="bg-white p-4 border-t border-slate-100 absolute bottom-0 w-full z-30">
         {isLocked ? (
           <div className="flex items-center justify-center p-3 bg-slate-50 text-slate-500 rounded-lg border border-slate-200 gap-2">
             <Lock className="w-4 h-4" />
