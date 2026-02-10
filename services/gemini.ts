@@ -1,8 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { Message, Sender } from "../types";
 
-// Removed top-level initialization. 
-// This prevents the app from crashing immediately if process.env is undefined or the key is missing.
+// Removed top-level initialization to prevent crashes.
 
 const SYSTEM_INSTRUCTION = `Du bist ein freundlicher, empathischer Begleiter für eine Forschungsstudie. 
 Deine Aufgabe ist es, ein kurzes, unterstützendes Gespräch zu führen. 
@@ -10,28 +9,50 @@ Halte deine Antworten eher kurz und gesprächig (max 2-3 Sätze).
 Du bist kein Therapeut, sondern ein neutraler Zuhörer.
 Sprich Deutsch.`;
 
+// Helper function to safely retrieve the API key from various environment configurations
+const getApiKey = (): string => {
+  // 1. Check for Vite environment (Standard for modern React apps on Vercel)
+  try {
+    // @ts-ignore - import.meta might not be typed in all setups
+    if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // Ignore errors if import.meta is not supported
+  }
+
+  // 2. Check for Process environment (Create React App, Next.js, or Webpack)
+  try {
+    if (typeof process !== "undefined" && process.env) {
+      // Priority: Specific Frontend Prefixes
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+      
+      // Fallback: Plain API_KEY (Only works if explicitly exposed by bundler config)
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore errors if process is not defined
+  }
+
+  return "";
+};
+
 export const getAIResponse = async (history: Message[], newMessage: string): Promise<string> => {
   try {
-    // 1. Safely retrieve API Key without crashing
-    let apiKey = "";
-    try {
-      // Check if process exists before accessing it (prevents 'process is not defined' error in browsers)
-      if (typeof process !== "undefined" && process.env) {
-        apiKey = process.env.API_KEY || "";
-      }
-    } catch (e) {
-      console.warn("Environment check failed, running in demo mode.");
-    }
+    // 1. Retrieve API Key
+    const apiKey = getApiKey();
 
     // 2. Fallback if no key is found (Demo Mode)
     if (!apiKey) {
-      console.log("No API Key found. Returning mock response.");
+      console.log("No API Key found in VITE_API_KEY, REACT_APP_API_KEY, or API_KEY.");
       // Simulate network delay for realism
       await new Promise(resolve => setTimeout(resolve, 1000));
-      return "Dies ist eine Demo-Antwort. Die App läuft im 'Rohmodus', da kein API-Key gefunden wurde. Bitte füge 'API_KEY' in den Vercel-Umgebungsvariablen hinzu, um die echte AI zu aktivieren.";
+      return "Dies ist eine Demo-Antwort. API-Key fehlt. Bitte benenne die Variable in Vercel in 'VITE_API_KEY' (für Vite) oder 'REACT_APP_API_KEY' (für CRA) um, damit der Browser Zugriff darauf hat.";
     }
 
-    // 3. Initialize AI only when actually needed
+    // 3. Initialize AI
     const ai = new GoogleGenAI({ apiKey: apiKey });
 
     // Transform internal message history to Gemini format
