@@ -36,20 +36,10 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
 
     if (userError) throw userError;
 
-    // B. Check for existing session today
-    // CRITICAL FIX: We alias 'messages' to ensure the property name is consistent
-    // and select specific fields to avoid ambiguity.
+    // B. Check for existing session today (Session Only first)
     let { data: sessionData, error: sessionError } = await supabase
       .from('daily_sessions')
-      .select(`
-        *,
-        messages:messages (
-          id,
-          content,
-          sender,
-          created_at
-        )
-      `)
+      .select('*')
       .eq('study_id', studyId)
       .eq('date', today)
       .single();
@@ -72,21 +62,32 @@ export const loginAndFetchData = async (studyId: string): Promise<UserState> => 
         .single();
       
       if (createError) throw createError;
-      sessionData = { ...newSession, messages: [] };
+      sessionData = newSession;
     }
 
-    // Sort messages by creation time (Oldest top, Newest bottom)
+    // D. Fetch Messages Separately (More robust than Join)
+    // We explicitly fetch messages for this session ID ensuring we get the history
     let sortedMessages: Message[] = [];
-    if (sessionData.messages && Array.isArray(sessionData.messages)) {
-        sortedMessages = sessionData.messages.map((m: any) => ({
-            id: m.id,
-            text: m.content,
-            sender: m.sender as Sender,
-            timestamp: new Date(m.created_at).getTime()
-        })).sort((a: Message, b: Message) => a.timestamp - b.timestamp);
+    if (sessionData && sessionData.id) {
+        const { data: messagesData, error: messagesError } = await supabase
+            .from('messages')
+            .select('id, content, sender, created_at')
+            .eq('session_id', sessionData.id)
+            .order('created_at', { ascending: true });
+        
+        if (messagesError) {
+            console.error("Error fetching messages:", messagesError);
+        } else if (messagesData) {
+             sortedMessages = messagesData.map((m: any) => ({
+                id: m.id,
+                text: m.content,
+                sender: m.sender as Sender,
+                timestamp: new Date(m.created_at).getTime()
+            }));
+        }
     }
 
-    // D. Map DB structure to App structure
+    // E. Map DB structure to App structure
     const mappedSession: DailySession = {
       id: sessionData.id,
       date: sessionData.date,
