@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserState, AppScreen, Sender, SurveyResponse } from './types';
 import { 
   loginAndFetchData,
@@ -18,8 +18,19 @@ import { Loader2 } from 'lucide-react';
 const App: React.FC = () => {
   // Explicitly initialize with null/empty state to force Login on refresh
   const [userState, setUserState] = useState<UserState>({ id: null, sessions: {} });
+  
+  // REF PATTERN: We use a Ref to track the latest state.
+  // This prevents "Stale Closures" where async functions (like the 2-second AI wait)
+  // overwrite the state with an old version because they captured the variable too early.
+  const userStateRef = useRef<UserState>(userState);
+
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
   const [loading, setLoading] = useState(false);
+
+  // Keep Ref in sync with State
+  useEffect(() => {
+    userStateRef.current = userState;
+  }, [userState]);
 
   // Security Guard: Check on mount and update if user is missing but screen is protected
   useEffect(() => {
@@ -67,17 +78,22 @@ const App: React.FC = () => {
   };
 
   const handleSendMessage = async (text: string, sender: Sender) => {
-    const session = getTodaySessionOrEmpty(userState);
+    // CRITICAL FIX: Use userStateRef.current instead of userState
+    // This ensures we always add messages to the LATEST state, 
+    // even if this function is called after an async delay (AI response).
+    const currentLatestState = userStateRef.current;
+    
+    const session = getTodaySessionOrEmpty(currentLatestState);
     if (!session.id && sender === Sender.USER) {
         console.warn("No session ID found during chat");
     }
     
     const newState = await saveMessageToDb(
-      userState.id!, 
+      currentLatestState.id!, 
       session.id || 'temp-offline-id', 
       text, 
       sender, 
-      userState
+      currentLatestState
     );
     setUserState(newState);
   };
@@ -87,14 +103,17 @@ const App: React.FC = () => {
   };
 
   const handleSurveySubmit = async (data: SurveyResponse) => {
-    const session = getTodaySessionOrEmpty(userState);
+    // Use Ref here too for consistency/safety
+    const currentLatestState = userStateRef.current;
+    const session = getTodaySessionOrEmpty(currentLatestState);
+    
     setLoading(true);
     try {
         const newState = await saveSurveyToDb(
-            userState.id!,
+            currentLatestState.id!,
             session.id || 'temp-offline-id',
             data,
-            userState
+            currentLatestState
         );
         setUserState(newState);
         setCurrentScreen(AppScreen.COMPLETED);
