@@ -98,12 +98,39 @@ const App: React.FC = () => {
     setUserState(newState);
   };
 
-  const handleStartSurvey = () => {
-    setCurrentScreen(AppScreen.SURVEY);
+  const handleStartSurvey = async () => {
+    // OLD BEHAVIOR: setCurrentScreen(AppScreen.SURVEY);
+    // NEW BEHAVIOR: User clicked the external Qualtrics link.
+    // We optimistically mark the session as "survey completed" locally and in DB
+    // so they see the Completion screen when they return (or immediately).
+    
+    const currentLatestState = userStateRef.current;
+    const session = getTodaySessionOrEmpty(currentLatestState);
+    
+    setLoading(true);
+    try {
+        // Create a placeholder response since the actual data is on Qualtrics
+        const placeholderResponse: SurveyResponse = {
+            date: new Date().toISOString(),
+            externalCompleted: true
+        };
+
+        const newState = await saveSurveyToDb(
+            currentLatestState.id!,
+            session.id || 'temp-offline-id',
+            placeholderResponse,
+            currentLatestState
+        );
+        setUserState(newState);
+        setCurrentScreen(AppScreen.COMPLETED);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleSurveySubmit = async (data: SurveyResponse) => {
-    // Use Ref here too for consistency/safety
+    // This might still be called if we reused SurveyScreen, but for now 
+    // handleStartSurvey bypasses it. Keeping logic just in case.
     const currentLatestState = userStateRef.current;
     const session = getTodaySessionOrEmpty(currentLatestState);
     

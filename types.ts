@@ -1,3 +1,4 @@
+
 export enum Sender {
   USER = 'user',
   MODEL = 'model'
@@ -12,9 +13,10 @@ export interface Message {
 
 export interface SurveyResponse {
   date: string;
-  q1_mood: number; // 1-5
-  q2_helpfulness: number; // 1-5
-  q3_comments: string;
+  q1_mood?: number; // Optional now, as we use external Qualtrics
+  q2_helpfulness?: number; 
+  q3_comments?: string;
+  externalCompleted?: boolean; // New flag
 }
 
 export interface DailySession {

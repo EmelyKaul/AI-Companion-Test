@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Sender, DailySession } from '../types';
 import { getAIResponse } from '../services/gemini';
-import { Send, ListChecks, Lock, Clock, User, Sparkles, LogOut } from 'lucide-react';
+import { Send, ExternalLink, Lock, Clock, User, Sparkles, LogOut } from 'lucide-react';
 
 interface ChatScreenProps {
   session: DailySession;
@@ -56,6 +56,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSurveyClick = () => {
+    // Notify App to mark session as "completed" (optimistic completion)
+    // The browser handles opening the link in a new tab via the <a> tag
+    onStartSurvey();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -173,17 +179,20 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ session, onSendMessage, onStart
       {/* Floating Action Button (Survey) */}
       {canStartSurvey && (
         <div className="absolute bottom-20 left-0 right-0 px-4 flex justify-center z-20">
-          <button
-            onClick={onStartSurvey}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all transform hover:scale-105 ${
+          <a
+            href="https://wisotudortmund.eu.qualtrics.com/jfe/form/SV_8oxQOWJRIMMtbZc"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleSurveyClick}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all transform hover:scale-105 no-underline cursor-pointer ${
               isLocked 
                 ? 'bg-accent text-white animate-pulse' 
                 : 'bg-white text-accent border-2 border-accent hover:bg-accent hover:text-white'
             }`}
           >
-            <ListChecks className="w-5 h-5" />
-            Umfrage starten
-          </button>
+            <ExternalLink className="w-5 h-5" />
+            Umfrage auf Qualtrics starten
+          </a>
         </div>
       )}
 
